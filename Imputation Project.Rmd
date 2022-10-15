@@ -1,0 +1,43 @@
+---
+title: "Imputation Project"
+author: "Vlad"
+date: "2022-10-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+knndata <- read.csv("/Users/monikavlad/Desktop/dr woo data/Framingham_KNN_Imputation.csv")
+meandata <- read.csv("/Users/monikavlad/Desktop/dr woo data/Framingham_Mean_Imputation.csv")
+regdata <- read.csv("/Users/monikavlad/Desktop/dr woo data/Framingham_Regression_Imputation.csv")
+
+#knnimputation
+
+#prepare categorical variables
+knnimputation <- relevel(factor(knndata$SEX), "Male")
+
+#Build a logistic regression model
+model1 <- glm(STROKE ~., data = knndata, family = "binomial")
+summary(model1)
+
+#meanimputation
+
+# prepare categorical variables
+meanimputation <- relevel(factor(meandata$SEX), "Male")
+
+# Build a logistic regression model
+model2 <- glm(STROKE ~ ., data = meandata, family = "binomial")
+summary(model1)
+
+#regimputation
+
+# prepare categorical variables
+meanimputation <- relevel(factor(regdata$SEX), "Male")
+
+# Build a logistic regression model
+model3 <- glm(STROKE ~ ., data = regdata, family = "binomial")
+summary(model1)
+```
