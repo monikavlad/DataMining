@@ -1,0 +1,210 @@
+---
+title: "Table Inflation"
+author: "Vlad"
+date: "2022-10-15"
+output: html_document
+---
+### Set up Chunk
+
+```{r setup, include=F}
+
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(scales)
+library(lubridate)
+library(timetk)
+library(riingo)
+library(tidyquant)
+
+# new packages
+library(gt)
+library(gtExtras)
+library(reactable)
+library(reactablefmtr)
+library(geomtextpath)
+
+
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, comment = NA)
+```
+
+```{r, warning = T}
+pcepi_cpi <- 
+  tribble(
+    ~symbol,    ~name,
+    "CPIAUCSL", "CPI Inflation",
+    "PCEPI",    "PCE Inflation") %>% 
+  # go to FRED and find the symbol and import to our environ
+  tq_get(get = "economic.data", from = "1979-01-01") %>% 
+  group_by(name) %>% 
+  mutate(mom_change = price/lag(price, 1) - 1) 
+
+pcepi_cpi %>% 
+  filter(!is.na(mom_change)) %>% 
+  slice(1, n())
+
+```
+```{r}
+
+pcepi_core <- 
+  "PCEPILFE" %>% 
+  tq_get(get = "economic.data", from = "1979-01-01") %>% 
+  mutate(pcepi_core_mom = price/lag(price, 1) - 1)
+
+cpi_core <- 
+  "CPILFESL" %>% 
+  tq_get(get = "economic.data", from = "1979-01-01") %>% 
+  mutate(cpi_core_mom = price/lag(price, 1) - 1)
+
+pcepi_core_cpi_core <- 
+  pcepi_cpi %>% 
+  select(date, name, mom_change) %>%
+  filter(date >= "2021-01-01") %>% 
+  pivot_wider(names_from = "name", values_from = "mom_change") %>% 
+  rename_with(~str_to_lower(.) %>% 
+                str_replace(" inflation", "_mom")) %>%
+  left_join(cpi_core %>% select(date, cpi_core_mom)) %>% 
+  left_join(pcepi_core %>% select(date, pcepi_core_mom)) 
+
+pcepi_core_cpi_core %>% 
+  tail() %>% 
+  mutate(across(.cols = is.numeric,
+                .fns = formattable::percent)
+  )
+```
+
+```{r}
+pcepi_core_cpi_core %>% 
+  filter(date >= "2021-01-01") %>% 
+arrange(desc(date)) %>%
+   tail() %>% 
+  gt()
+```
+
+
+
+```{r}
+pcepi_core_cpi_core %>% 
+  mutate(date = as.yearmon(date)) %>% 
+  filter(date >= "2021-01-01") %>% 
+arrange(desc(date)) %>% 
+  # replace(is.na(.), 0) %>% 
+  gt(rowname_col = "date") %>% 
+  cols_label(
+    pce_mom = "PCEPI",
+    pcepi_core_mom = "PCEPI Core",
+    cpi_mom = "CPI",
+    cpi_core_mom = "CPI Core"
+  ) %>% 
+  fmt_percent(
+    columns = is.numeric
+  ) %>% 
+  tab_header(title = "PCEPI, CPI and Core MoM % Changes",
+             subtitle = "The measure matters")  %>% 
+  #  data_color(
+  #   columns =  is.numeric,
+  #   colors = scales::col_numeric(colorspace::diverge_hcl(n = 25,  palette = "Blue-Red 3"),
+  #   domain = c(.05, .09))
+  # ) %>%
+  gt_hulk_col_numeric(
+    columns = is.numeric,
+    domain = c(-.0012, 0.014)
+  )
+```
+
+```{r}
+pcepi_core_cpi_core %>% 
+  mutate(date = as.yearmon(date)) %>% 
+  filter(date >= "2021-01-01") %>% 
+arrange(desc(date)) %>% 
+  # replace(is.na(.), 0) %>% 
+  gt(rowname_col = "date") %>% 
+  cols_label(
+    pce_mom = "PCEPI",
+    pcepi_core_mom = "PCEPI Core",
+    cpi_mom = "CPI",
+    cpi_core_mom = "CPI Core"
+  ) %>% 
+  fmt_percent(
+    columns = is.numeric
+  ) %>% 
+  tab_header(title = "PCEPI, CPI and Core MoM % Changes",
+             subtitle = "The measure matters")  %>% 
+data_color(columns =  is.numeric,colors = scales::col_numeric(colorspace::diverge_hcl(n = 25,  palette = "Blue-Red 3"),domain = c(-.0012, 0.014))) 
+```
+
+
+```{r}
+pcepi_core_cpi_core %>% 
+  mutate(date = as.yearmon(date)) %>% 
+  filter(date >= "2021-01-01") %>% 
+arrange(desc(date)) %>% 
+  # replace(is.na(.), 0) %>% 
+  gt(rowname_col = "date") %>% 
+  cols_label(
+    pce_mom = "PCEPI",
+    pcepi_core_mom = "PCEPI Core",
+    cpi_mom = "CPI",
+    cpi_core_mom = "CPI Core"
+  ) %>% 
+  fmt_percent(
+    columns = is.numeric
+  ) %>% 
+  tab_header(title = "PCEPI, CPI and Core MoM % Changes",
+             subtitle = "The measure matters")  %>% 
+data_color(columns =  is.numeric,
+           colors = scales::col_numeric(
+             colorspace::diverge_hcl(n = 25,  palette = "Cyan-Magenta"),
+             domain = c(-.0012, 0.014))) 
+```
+
+```{r}
+pcepi_core_cpi_core %>% 
+  mutate(date = as.yearmon(date)) %>% 
+  filter(date >= "2021-01-01") %>% 
+arrange(desc(date)) %>% 
+  # replace(is.na(.), 0) %>% 
+  gt(rowname_col = "date") %>% 
+  cols_label(
+    pce_mom = "PCEPI",
+    pcepi_core_mom = "PCEPI Core",
+    cpi_mom = "CPI",
+    cpi_core_mom = "CPI Core"
+  ) %>% 
+  fmt_percent(
+    columns = is.numeric
+  ) %>% 
+  tab_header(title = "PCEPI, CPI and Core MoM % Changes",
+             subtitle = "The measure matters")  %>% 
+data_color(columns =  is.numeric,
+           colors = scales::col_numeric(
+             colorspace::diverge_hcl(n = 25,  palette = "Green-Orange"),
+             domain = c(-.0012, 0.014))) 
+```
+
+
+### FINAL TABLE
+I chose the data_color() because it was the best way to personalize my table and this function offers us more creative freedom. I personally like the tropic palette. The color contrast works well. The table is aesthetically pleasing to the eye as well as easy and intuitive to read.
+```{r}
+pcepi_core_cpi_core %>% 
+  mutate(date = as.yearmon(date)) %>% 
+  filter(date >= "2021-01-01") %>% 
+arrange(desc(date)) %>% 
+  # replace(is.na(.), 0) %>% 
+  gt(rowname_col = "date") %>% 
+  cols_label(
+    pce_mom = "PCEPI",
+    pcepi_core_mom = "PCEPI Core",
+    cpi_mom = "CPI",
+    cpi_core_mom = "CPI Core"
+  ) %>% 
+  fmt_percent(
+    columns = is.numeric
+  ) %>% 
+  tab_header(title = "PCEPI, CPI and Core MoM % Changes",
+             subtitle = "The measure matters")  %>% 
+data_color(columns =  is.numeric,
+           colors = scales::col_numeric(
+             colorspace::diverge_hcl(n = 25,  palette = "Tropic"),
+             domain = c(-.0012, 0.014))) 
+```

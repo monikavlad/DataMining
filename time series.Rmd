@@ -1,0 +1,113 @@
+---
+title: "time series"
+author: "Vlad"
+date: "2022-10-15"
+output: html_document
+---
+---
+```{r setup, include=FALSE}
+library(pdftools)
+library(tidyverse)
+library(tidytext)
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+fed_import_2 <- pdf_text("https://www.federalreserve.gov/monetarypolicy/files/20210709_mprfullreport.pdf")
+
+ head(fed_import_2 )
+```
+cleaning the data
+```{r}
+fed_text_raw <-
+  tibble(text = str_split(fed_import_2, "\r") %>% unlist()) %>%
+  mutate(report = "July2021",
+         line = row_number(),
+         text = str_squish(text))
+
+head(fed_text_raw)
+```
+breaking the text into individual tokens
+```{r}
+fed_text <- 
+  fed_text_raw %>% 
+  unnest_tokens(word, text)
+
+fed_text
+```
+number of times each word is used(word count)
+```{r}
+
+fed_text  %>%
+  count(word, sort = TRUE) 
+```
+remove "stop-words"
+```{r}
+fed_text  %>%
+  anti_join(stop_words)%>%
+  count(word, sort = TRUE)
+```
+
+removing numbers from the text
+```{r}
+fed_text2 <- 
+  fed_text %>% 
+  mutate(word = gsub("[^A-Za-z ]", "", word)) %>%
+  filter(word != "")
+
+fed_text2  %>%
+  anti_join(stop_words)%>%
+  count(word, sort = TRUE) 
+```
+### most commonly used words:
+inflation
+federal
+policy
+rate
+percent
+
+
+bing lexicon
+```{r}
+get_sentiments("bing") 
+```
+```{r}
+fed_text2 %>%
+    anti_join(stop_words)%>%
+  inner_join(get_sentiments("bing"), 
+            by = c("word") )%>%
+    count(word, sentiment, sort = TRUE)
+```
+
+### most commonly used words:
+risks (negative)
+confidence (positive)
+recovery (positive)
+support (positive)
+balanced (positive)
+
+
+```{r}
+get_sentiments("bing") %>%
+  filter(word == "risks")
+```
+
+```{r}
+get_sentiments("bing") %>%
+  filter(word == "confidence")
+```
+
+```{r}
+get_sentiments("bing") %>%
+  filter(word == "recovery")
+```
+
+
+```{r}
+get_sentiments("bing") %>%
+  filter(word == "support")
+```
+
+```{r}
+get_sentiments("bing") %>%
+  filter(word == "balanced")
+```

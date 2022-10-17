@@ -1,0 +1,347 @@
+---
+title: "HIP"
+author: "Vlad"
+date: "2022-10-15"
+output: html_document
+---
+
+### 1. Set up Chunk
+
+```{r setup, include=F}
+
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(scales)
+library(lubridate)
+library(timetk)
+library(riingo)
+library(tidyquant)
+library(gt)
+library(gtExtras)
+library(reactable)
+library(reactablefmtr)
+library(geomtextpath)
+library(curl)
+library(readxl)
+library(usethis)
+library(tidytext)
+library(pdftools)
+library(corrr)
+
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, comment = NA)
+
+```
+
+### 2. Import the data
+
+```{r}
+data_fmhpi <- read.csv("https://www.freddiemac.com/fmac-resources/research/docs/fmhpi_master_file.csv")
+
+head(data_fmhpi)
+summary(data_fmhpi)
+```
+
+
+### 3. Wrangle
+create a new variable Date in y-m-d format
+```{r}
+data_fmhpi$date <- as.Date(with(data_fmhpi, paste(Year, Month, 01, sep="-")), "%Y-%m-%d")
+
+head(data_fmhpi)
+```
+filter to observations > 1999-12-01
+```{r}
+
+data_fmhpi <- data_fmhpi %>% filter(date > "1999-12-01")
+
+```
+only keep the data for AK, GA, CA, CO, TX
+
+```{r}
+data_fmhpi <- data_fmhpi %>% filter(GEO_Name %in% c("AK", "GA", "CO", "CA", "TX"))
+head(data_fmhpi)
+```
+
+changing the name of the column GEO_Name to State
+```{r}
+
+colnames(data_fmhpi)[4] = "State"
+head(data_fmhpi)
+
+```
+```{r}
+data_fmhpi <- data_fmhpi %>% select(4, 6, 8)
+head(data_fmhpi)
+```
+create a new column "percent change" 
+save the new object as a new dataframe "data_fmhpi1
+```{r}
+data_fmhpi1 <- data_fmhpi %>%
+  arrange(date) %>%
+  mutate(percent_change = (Index_NSA/lag(Index_NSA)-1) * 100)
+head(data_fmhpi1)
+```
+### 4. Chart the trend over time in HPI for 5 states
+
+```{r}
+data_fmhpi1 %>%
+  ggplot(aes(x = date, y = Index_NSA, fill = State)) +
+  geom_col(
+    show.legend = F
+  ) +
+  labs(title = "HPI trend over time",
+       y = "",
+       x = "",
+       fill = "") +
+  #scale_y_continuous(labels = percent_format(scale = 1),
+  #                   breaks = pretty_breaks(n = 5)) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5) ) +
+  facet_wrap(~State,
+             ncol = 2)
+
+```
+HPI for AK has a steady slow increase from 2000-2022
+HPI for CO has a steady increase from 2000 to 2012 and then we see an increase at a higher rate with a peak around 2022
+HPI for TX has a relatively steady and slow increase from 2000 to 2012 and then we see an increase at a higher rate from 2012 to 2022
+HPI for CA has a fast growing increase with a peak around 2007 and then we have a decreases from 2007 to about 2012 with a steady increase and a peak around 2021
+HPI for GA has a slow increase until 2008 and a slow increase from 2008 to 2012, and a slow increase from 2012 to 2022
+
+```{r}
+data_fmhpi1 %>% 
+  ggplot(aes(x = date, y = Index_NSA, color = State)) +
+  geom_line() +
+  labs(title = "HPI trend over time", 
+       y = "", 
+       x = "",
+       fill = "") +
+ # scale_y_continuous(labels = percent_format(scale = 1),
+  #                   breaks = pretty_breaks(n = 5)) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5) ) +
+  facet_wrap(~State,
+             ncol = 2)
+```
+
+
+chart options:
+
+```{r}
+data_fmhpi1 %>%
+  ggplot(aes(x = date, y = percent_change, fill = State)) +
+  geom_line(show.legend = F,
+             color = "steelblue") +
+  labs(title = "Percent Change HPI from Previous Quarter", 
+       y = "", 
+       x = "",
+       fill = "") +
+  scale_y_continuous(labels = percent,
+                     breaks = pretty_breaks(n = 5)) +
+ 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .7)) +
+  facet_wrap(~State,
+             ncol = 2)
+```
+```{r}
+data_fmhpi1 %>%
+  ggplot(aes(x = date, y = percent_change, fill = State)) +
+  geom_col(fill = "steelblue",
+           width = 15) +
+  labs(title = "Percent Change HPI from Previous Quarter", 
+       y = "", 
+       x = "",
+       fill = "") +
+  scale_y_continuous(labels = percent,
+                     breaks = pretty_breaks(n = 5)) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .75)) + 
+  facet_wrap(~State,
+             ncol = 2)
+```
+### 5. Chart the trend over time in annual percent change in HPI for 5 states
+```{r}
+data_fmhpi1 %>% 
+  ggplot(aes(x = date, y = percent_change, color = State)) +
+  geom_line() +
+  labs(title = "Annual Percent Change in HPI over time", 
+       y = "", 
+       x = "",
+       fill = "") +
+  scale_y_continuous(labels = percent_format(scale = .5),
+                     breaks = pretty_breaks(n = 5)) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .7) ) +
+  facet_wrap(~State,
+             ncol = 2)
+```
+
+```{r}
+data_fmhpi1 %>% 
+  ggplot(aes(x = date, y = percent_change, fill = State)) +
+  geom_col() +
+  labs(title = "Annual Percent Change in HPI over time", 
+       y = "", 
+       x = "",
+       fill = "") +
+  scale_y_continuous(labels = percent_format(scale = .5),
+                     breaks = pretty_breaks(n = 5)) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .7) ) +
+  facet_wrap(~State,
+             ncol = 2)
+```
+Annual percent change in AK is positive from the year of 2000 to 2016 and then we have a switch a slow decrease to a negative annual percent change from 2016 to 2022
+Annual percent change in CO starts at a low positive percentage and then decreases at a high rate until 2006 and then we see soft increases and decreases from 2006 to 2022
+Annual percent change in TX is close to 0 from 2000 to 2008 and then we see an increase at a high rate from 2008 to 2022 with a peak at 2011
+Annual percent change in CA starts of with low negative numbers from 2000-2001 with a fast increase from 2001 to 2006 and then a fast decrease from positive to negative change from 2006 to 2012 and then we see a steady increase from negative change to positive change from 2012 to 2022
+Annual percent change in GA starts of with change close to 0 from 2000 to 2008 and then a steady decrease with small deviations from 2008 to 2022
+### 6. Distribution of percent change in HPI for 5 states
+```{r}
+data_fmhpi1 %>% 
+  ggplot(aes(x =  percent_change, fill = State)) +
+  geom_histogram(
+    show.legend = F
+  ) +
+  labs(title = "Histrograms of Annual Percent Changes in HPI", 
+       y = "", 
+       x = "",
+       fill = "") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .1),
+        axis.text.x = element_blank()) +
+  facet_wrap(~State)
+```
+Distribution of annual percent changes in HPI in AK is left skewed with a lot of deviations
+Distribution of annual percent changes in HPI in CA is bimodal with some deviations
+Distribution of annual percent changes in HPI in CO is left skewed with deviations
+Distribution of annual percent changes in HPI in GA in bimodal with deviations
+Distribution of annual percent changes in HPI in TX is bimodal with deivations
+
+### 7. Chart the relationship
+first we wrangle data
+then plot scatterplot
+
+```{r}
+data_fmhpi1 %>% 
+  filter(State %in% c("GA", "TX")) %>%
+  select(-Index_NSA) %>%
+  pivot_wider(names_from = State,
+              values_from = percent_change)
+```
+```{r}
+data_fmhpi1 %>% 
+  filter(State %in% c("GA", "TX")) %>%
+  select(-Index_NSA) %>%
+  pivot_wider(names_from = State,
+              values_from = percent_change) %>% 
+  ggplot(aes(x =  GA, y = TX, 
+             color = year(date) %>% as_factor())) +
+  geom_point(
+    #color = "purple",
+    show.legend = T
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = F,
+    color = "pink",
+    size = .5
+    
+  ) +
+  labs(title = "GA v. TX", 
+       y = "TX", 
+       x = "GA")
+  # scale_y_continuous(labels = percent_format(scale = 1),
+  #                    breaks = pretty_breaks(n = 10)) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5),
+        axis.text.x = element_blank())
+```
+### 8. create a table displaying the rolling 3-month average HPI for the last 6 months
+
+```{r}
+data_fmhpi1 %>%
+  summarise_by_time(.date_var = date,
+                    .by = "3 months",
+                    avg_HPI = mean(Index_NSA)) %>%
+  tail()
+
+
+```
+
+### 9 import data from FRED on CPI inflation since 1999 and join to existing data frame
+```{r}
+cpi_core <- 
+  "CPIAUCSL" %>% 
+  tq_get(get = "economic.data", from = "1999-01-01") %>%
+  tail()
+
+cpi_core %>%
+  summarise_by_time(.date_var = date,
+                    .by = "3 months",
+                    avg_price = mean(price)) %>%
+  tail()
+cpi_core1 <- cpi_core %>%
+  arrange(date) %>%
+  mutate(percent_change_cpi = (price/lag(price)-1) * 100)
+head(cpi_core1)
+
+joint_data <-
+  cpi_core1 %>%
+  select(-symbol) %>%
+  left_join(
+    data_fmhpi1,
+    by = "date"
+  )
+  
+```
+
+### 10 which states appear to be highly correlated with overall inflation data since 1999?
+rolling correlation vs overall correlation
+chart to support answer
+
+```{r}
+joint_data %>% 
+correlate( quiet = TRUE) %>%
+gt()
+
+```
+```{r}
+joint_data %>%
+  filter(State == "AK") %>%
+  correlate(quiet = TRUE) %>%
+  gt()
+```
+Correlation between annual change in CPI and annual change in HPI for AK is -0.80377512 which is a high negative correlation.
+```{r}
+
+joint_data %>%
+  filter(State == "CA") %>%
+  correlate(quiet = TRUE) %>%
+gt()
+```
+Correlation between annual change in CPI and annual change in HPI for CA is 0.49137226 which is relatively weak positive correlation
+```{r}
+
+joint_data %>%
+  filter(State == "CO") %>%
+  correlate(quiet = TRUE) %>%
+gt()
+```
+Correlation between annual change in CPI and annual change in HPI for CO is -0.32280093 which is a weak negative correlation
+```{r}
+joint_data %>%
+  filter(State == "GA") %>%
+  correlate(quiet = TRUE)%>% 
+gt()
+```
+Correlation between annual change in CPI and annual change in HPI for GA is -0.47206470 which is a relatively weak negative correlation
+```{r}
+joint_data %>%
+  filter(State == "TX") %>%
+  correlate(quiet = TRUE) %>%
+gt()
+
+```
+Correlation between annual change in CPI and annual change in HPI for TX is 0.54156440 which is aa relatively weak positive correlation

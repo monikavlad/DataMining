@@ -1,0 +1,208 @@
+---
+title: "Visualization"
+author: "Vlad"
+date: "2022-10-15"
+output: html_document
+---
+
+### immport and load libraries
+
+```{r setup, include=FALSE}
+# load our packages for today
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(scales)
+library(lubridate)
+
+url <- "https://apps.bea.gov/national/Release/XLS/Survey/Section1All_xls.xlsx"
+
+destfile <- "Section1All_xls.xlsx"
+
+curl::curl_download(url, destfile)
+
+
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, comment = NA)
+
+```
+
+### wrangling
+
+```{r}
+pce_percent_change_from_spreadsheet <- 
+ read_excel(destfile, sheet = "T10101-Q", 
+    skip = 7) %>% 
+  select(-1)  %>% 
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+    ) %>% 
+  pivot_longer(-account:-code, 
+               names_to = "date", 
+               values_to = "percent_change") %>% 
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date)) %>%  
+  filter(account == "Personal consumption expenditures")  %>% 
+  arrange(desc(date)) %>% 
+  relocate(date, everything()) 
+```
+
+line chart
+
+```{r}
+
+pce_percent_change_from_spreadsheet %>%
+  filter(date > "2018-01-01") %>% 
+  ggplot(aes(x = date, y = percent_change)) +
+  geom_line(show.legend = F,
+             color = "red") +
+  labs(title = "Percent Change PCE from Previous Quarter", 
+       y = "", 
+       x = "",
+       caption = "Source: FRED data") +
+  scale_y_continuous(labels = percent,
+                     breaks = pretty_breaks(n = 10)) +
+  scale_x_date(date_breaks = "6 months",
+               date_labels = "%b %y")  +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5)) 
+```
+relationship btw two components
+```{r}
+read_excel("Section1All_xls.xlsx", sheet = "T10101-Q", 
+    skip = 7) %>% 
+  select(-1)  %>% 
+  rename(account = 1, code = 2)  %>% 
+  distinct(account)
+```
+```{r}
+read_excel("Section1All_xls.xlsx", sheet = "T10101-Q", 
+    skip = 7) %>% 
+  select(-1)  %>% 
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+    ) %>% 
+  pivot_longer(-account:-code, 
+               names_to = "date", 
+               values_to = "percent_change") %>% 
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date)) %>%  
+   filter(account %in% c("Personal consumption expenditures", "Exports", "Imports", "Durable goods", "Nondurable goods" )) %>% 
+  arrange(desc(date)) 
+```
+```{r}
+bea_data <- 
+read_excel("Section1All_xls.xlsx", sheet = "T10101-Q", 
+    skip = 7) %>% 
+  select(-1)  %>% 
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+    ) %>% 
+  pivot_longer(-account:-code, 
+               names_to = "date", 
+               values_to = "percent_change") %>% 
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date)) %>%  
+   filter(account %in% c("Personal consumption expenditures",
+                         "Exports", 
+                         "Imports",
+                         "Durable goods",
+                         "Nondurable goods" )) %>% 
+  arrange(desc(date)) %>% 
+  relocate(date, everything()) %>% 
+  mutate(
+    account = 
+      case_when(
+        str_detect(account, "Personal") ~ "PCE",
+        str_detect(account, "Government") ~ "Government",
+        str_detect(account, "investment") ~ "Investment",
+        T ~ account
+      )
+  ) %>% 
+  group_by(account) %>% 
+  select(-code)
+
+bea_data %>% 
+  slice(1, n())
+```
+
+```{r}
+bea_data %>% 
+  filter(account %in% c("Imports", "Exports")) %>%
+  pivot_wider(names_from = account,
+              values_from = percent_change)
+```
+scatterplot
+
+```{r}
+bea_data %>% 
+  filter(account %in% c("Imports", "Exports")) %>%
+  pivot_wider(names_from = account,
+              values_from = percent_change) %>% 
+  ggplot(aes(x =  Imports, y = Exports)) +
+  geom_point(
+    color = "purple",
+    show.legend = F
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = F,
+    color = "pink",
+    size = .5
+    
+  ) +
+  labs(title = "Imports v. Exports", 
+       y = "Exports", 
+       x = "Imports",
+       caption = "Source: FRED data") +
+  # scale_y_continuous(labels = percent_format(scale = 1),
+  #                    breaks = pretty_breaks(n = 10)) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5),
+        axis.text.x = element_blank())
+```
+### facet_wrap() helps us break up the data into subgroups to better represent the data 
+we want to use facet_wrap to break up a busy chart into seperate charts
+
+histogram
+
+```{r}
+bea_data %>% 
+  filter(account == "Exports") %>%  
+  ggplot(aes(x =  percent_change, fill = account)) +
+  geom_histogram(
+    show.legend = F
+  ) +
+  labs(title = "Histrograms of Percent Changes", 
+       y = "", 
+       x = "",
+       caption = "Source: FRED data",
+       fill = "") +
+  
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5),
+        axis.text.x = element_blank()) +
+  facet_wrap(~account)
+```
+```{r}
+bea_data %>% 
+  filter(account == "Exports") %>%  
+  ggplot(aes(x = account, y = percent_change)) +
+geom_violin(color = "red")  +
+  # geom_boxplot(outlier.shape = NA,
+  #              color = "steelblue",) +
+  # geom_jitter(width = 0.1,
+  #             alpha = .5,
+  #             color = "darkgreen") +
+labs(title = "Violin of percent changes", 
+       y = "", 
+       x = "",
+       caption = "Source: FRED data",
+       fill = "") +
+  scale_y_continuous(labels = percent_format(scale = 1),
+                     breaks = pretty_breaks(n = 10)) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5))
+```

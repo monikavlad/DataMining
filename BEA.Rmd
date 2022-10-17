@@ -1,0 +1,225 @@
+---
+title: "BEA data"
+author: "Vlad"
+date: "2022-10-15"
+output: html_document
+---
+
+
+### loading the packages
+
+```{r setup, include=FALSE}
+# load our packages for today
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(curl)
+library(lubridate)
+library(usethis)
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+### importing the data
+
+```{r}
+url <- "https://apps.bea.gov/national/Release/XLS/Survey/Section1All_xls.xlsx"
+```
+
+```{r}
+destfile <- "Section1All_xls.xlsx"
+curl::curl_download(url, destfile)
+```
+
+### choosing the sheet
+```{r}
+read_excel(destfile,
+           sheet = "T10103-A")
+```
+
+### wrangling the data
+# skip the first 7 rows
+```{r}
+read_excel(destfile,
+           sheet = "T10103-A",
+           skip = 7) %>%
+  head()
+```
+
+# remove a column called Line
+```{r}
+read_excel(destfile, sheet = "T10103-A", skip = 7) %>%
+  select(-Line) %>%
+  # view the first 10
+  head(10)
+```
+
+```{r}
+read_excel(destfile, sheet = "T10103-A",
+           skip = 7) %>%
+  select(-1) %>%
+  rename(account = `...2`, code = 2) %>%
+  head()
+```
+# change everything that contains A to numeric
+```{r}
+read_excel(destfile, sheet = "T10103-A",
+           skip = 7) %>%
+  select(-1) %>%
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(contains("A"), as.numeric))
+```
+# making long data
+```{r}
+read_excel(destfile, sheet = "T10103-A",
+           skip = 7) %>%
+  select(-1) %>%
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+  ) %>%
+  pivot_longer(-account:-code, names_to = "date", values_to = "quarter_percentchange")
+```
+# format the dates
+
+```{r}
+read_excel(destfile, sheet = "T10103-A",
+           skip = 7) %>%
+  select(-1) %>%
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+  ) %>%
+  pivot_longer(-account:-code, names_to = "date", values_to = "quarter_percentchange") %>%
+  mutate(date = parse_date_time(date, orders = "Yq")) %>%
+  tail()
+```
+```{r}
+read_excel(destfile, sheet = "T10103-A",
+           skip = 7) %>%
+  select(-1) %>%
+  rename(account = 1, code =2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+  ) %>%
+  pivot_longer(-account:-code, names_to = "date", values_to = "quarter_percentchange") %>%
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date))
+```
+# filtering 
+```{r}
+read_excel(destfile, sheet = "T10103-A",
+           skip = 7) %>%
+  select(-1) %>%
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+  )%>%
+  pivot_longer(-account:-code, names_to = "date", values_to = "quarter_percentchange") %>%
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date)) %>%
+  filter(account == "Durable goods")
+```
+# filtering the date and quarterly percent change
+```{r}
+
+read_excel(destfile, sheet = "T10103-A",
+           skip = 7) %>%
+  select(-1) %>%
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+  ) %>%
+  pivot_longer(-account:-code,
+               names_to = "date",
+               values_to = "quarter_percentchange") %>%
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date)) %>%
+  filter(quarter_percentchange < 1, 
+         date >= "2020-01-01",
+         account == "Durable goods")
+```
+```{r}
+read_excel(destfile, sheet = "T10103-A",
+           skip = 7) %>%
+  select(-1) %>%
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+    ) %>%
+  pivot_longer(-account:-code,
+               names_to = "date",
+               values_to = "quarter_percentchange") %>%
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date)) %>%
+  group_by(account) %>%
+  slice(1, n()) %>%
+  head()
+```
+  
+# arrange in descending order
+```{r}
+read_excel(destfile, sheet = "T10103-A", 
+    skip = 7) %>% 
+  select(-1)  %>% 
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+    ) %>% 
+  pivot_longer(-account:-code, 
+               names_to = "date", 
+               values_to = "quarter_percentchange") %>% 
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date)) %>% 
+  filter(account == "Durable goods")  %>% 
+  arrange(desc(date)) %>% 
+  head()
+```
+
+# rearrange columns
+```{r}
+read_excel(destfile, sheet = "T10103-A", 
+    skip = 7) %>% 
+  select(-1)  %>% 
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+    ) %>% 
+  pivot_longer(-account:-code, 
+               names_to = "date", 
+               values_to = "quarter_percentchange") %>% 
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date)) %>%  
+  filter(account == "Durable goods")  %>% 
+  arrange(desc(date)) %>% 
+  relocate(date, everything()) %>% 
+  head()
+
+```
+# naming the final product
+
+```{r}
+durable_goods_quarter_percent_change <- read_excel(destfile, sheet = "T10103-A", 
+    skip = 7) %>% 
+  select(-1)  %>% 
+  rename(account = 1, code = 2) %>%
+  mutate(
+    across(c(-account, -code), as.numeric)
+    ) %>% 
+  pivot_longer(-account:-code, 
+               names_to = "date", 
+               values_to = "quarter_percentchange") %>% 
+  mutate(date = parse_date_time(date, orders = "Yq"),
+         date = ymd(date)) %>%  
+  filter(account == "Durable goods")  %>% 
+  arrange(desc(date)) %>% 
+  relocate(date, everything()) 
+
+durable_goods_quarter_percent_change %>% 
+  distinct(account, .keep_all = T)
+```
+
+### mutate function
+<https://dplyr.tidyverse.org/reference/mutate.html> ## link for the mutate function
+### mutate function allows us to add new variables while preserving the existing varibles in the dataset we are working with
